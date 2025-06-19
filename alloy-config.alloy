@@ -1,0 +1,38 @@
+// Syslog source: listen for syslog from demo-app
+loki.source.syslog "demo" {
+  listener {
+    address = "0.0.0.0:51893"
+    labels  = { service_name = "demo-app", protocol = "tcp" }
+  }
+  listener {
+    address = "0.0.0.0:51898"
+    protocol = "udp"
+    labels  = { service_name = "demo-app", protocol = "udp" }
+  }
+  forward_to = [loki.process.syslog_to_json.receiver]
+}
+
+// Process syslog: convert to JSON
+loki.process "syslog_to_json" {
+  stage.json {
+    expressions = { "service_name" = "service_name", "protocol" = "protocol" }
+  }
+  stage.labels {
+    values = { "service_name" = "service_name", "message"= "_entry" }
+  }
+  stage.output {
+    source = "message"
+  }
+  forward_to = [loki.write.grafanacloud.receiver]
+}
+
+// Write to Grafana Cloud
+loki.write "grafanacloud" {
+  endpoint {
+    url = "https://logs-prod-018.grafana.net/loki/api/v1/push"
+    basic_auth {
+      username = "1249646"
+      password = sys.env("LOKI_API_TOKEN")
+    }
+  }
+}
